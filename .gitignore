@@ -1,0 +1,14 @@
+# Local meeting data and generated artifacts.
+# Keep directory placeholders, but never commit real audio or generated text.
+data/**
+!data/
+!data/**/
+!data/**/.gitkeep
+
+# Common temporary files.
+*.tmp
+*.temp
+*.log
+*.bak
+*.swp
+*.DS_Store
