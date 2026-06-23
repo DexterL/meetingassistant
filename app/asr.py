@@ -75,6 +75,13 @@ class FasterWhisperASRClient(ASRClient):
         self.device = str(config.get("device", "auto"))
         self.compute_type = str(config.get("compute_type", "default"))
         self.language = config.get("language", "zh")
+        self.beam_size = int(config.get("beam_size", 5))
+        self.best_of = int(config.get("best_of", 5))
+        self.temperature = config.get("temperature", 0)
+        self.vad_filter = bool(config.get("vad_filter", True))
+        self.vad_parameters = config.get("vad_parameters")
+        self.initial_prompt = config.get("initial_prompt")
+        self.condition_on_previous_text = bool(config.get("condition_on_previous_text", True))
 
     def transcribe(self, audio_path: Path) -> ASRResult:
         try:
@@ -90,7 +97,20 @@ class FasterWhisperASRClient(ASRClient):
 
         try:
             model = WhisperModel(self.model_name, **kwargs)
-            segments_iter, info = model.transcribe(str(audio_path), language=self.language)
+            transcribe_kwargs: dict[str, Any] = {
+                "language": self.language,
+                "beam_size": self.beam_size,
+                "best_of": self.best_of,
+                "temperature": self.temperature,
+                "vad_filter": self.vad_filter,
+                "condition_on_previous_text": self.condition_on_previous_text,
+            }
+            if self.vad_parameters:
+                transcribe_kwargs["vad_parameters"] = self.vad_parameters
+            if self.initial_prompt:
+                transcribe_kwargs["initial_prompt"] = self.initial_prompt
+
+            segments_iter, info = model.transcribe(str(audio_path), **transcribe_kwargs)
             segments = [
                 ASRSegment(start=float(segment.start), end=float(segment.end), text=segment.text)
                 for segment in segments_iter

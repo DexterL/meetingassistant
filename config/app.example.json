@@ -1,10 +1,19 @@
 {
   "asr": {
     "provider": "faster_whisper",
-    "model": "base",
+    "model": "small",
     "device": "auto",
     "compute_type": "default",
     "language": "zh",
+    "beam_size": 5,
+    "best_of": 5,
+    "temperature": 0,
+    "vad_filter": true,
+    "vad_parameters": {
+      "min_silence_duration_ms": 500
+    },
+    "condition_on_previous_text": true,
+    "initial_prompt": "以下是普通话会议录音，请使用简体中文输出，保留专有名词、人名、项目名和数字。",
     "enable_diarization": false
   },
   "llm": {
