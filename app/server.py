@@ -9,6 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from app.asr import ASRError, format_transcript, get_asr_client
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
@@ -223,8 +225,15 @@ class MeetingAssistantHandler(BaseHTTPRequestHandler):
         if audio is None:
             self.send_error_json(HTTPStatus.NOT_FOUND, "Audio file not found.")
             return
-        transcript = write_placeholder_transcript(meeting_id, audio.name)
-        self.send_json({"meeting_id": meeting_id, "transcript": transcript.name})
+        try:
+            result = get_asr_client().transcribe(audio)
+        except ASRError as exc:
+            self.send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, str(exc))
+            return
+
+        transcript = TRANSCRIPTS_DIR / f"{meeting_id}.md"
+        transcript.write_text(format_transcript(audio.name, result), encoding="utf-8")
+        self.send_json({"meeting_id": meeting_id, "transcript": transcript.name, "segments": len(result.segments)})
 
     def handle_placeholder_process(self, meeting_id: str) -> None:
         audio = self.find_audio(meeting_id)

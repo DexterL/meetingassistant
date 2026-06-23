@@ -41,3 +41,27 @@ data/summaries/    会议内容提要
 - 本地文件列表
 - 转写稿和内容提要预览
 - 占位处理接口，为后续 ASR/LLM 接入保留流程
+
+## ASR 配置
+
+安装本地 ASR 依赖：
+
+```bash
+brew install ffmpeg
+uv venv --python /Users/dexterl/.local/bin/python3.11 .venv
+uv pip install --python .venv/bin/python faster-whisper
+```
+
+复制示例配置后按本机模型环境调整：
+
+```bash
+cp config/app.example.json config/app.json
+```
+
+当前代码优先支持 `faster-whisper`。未安装本地 ASR 依赖时，转写接口会返回明确错误，不会调用外网服务。
+
+安装依赖后可直接用脚本转写：
+
+```bash
+.venv/bin/python scripts/transcribe_audio.py 讨论音频样例
+```

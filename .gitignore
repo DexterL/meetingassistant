@@ -17,3 +17,6 @@ data/**
 __pycache__/
 *.py[cod]
 .venv/
+
+# Local runtime config can contain machine-specific model paths and endpoints.
+config/app.json

@@ -57,15 +57,15 @@ function renderAudioFiles(files) {
       <div class="file-name"></div>
       <div class="file-meta">${formatBytes(file.size)} · ${formatTime(file.updated_at)}</div>
       <div class="file-actions">
-        <button type="button" data-action="process">生成占位稿</button>
+        <button type="button" data-action="transcribe">执行转写</button>
       </div>
     `;
     item.querySelector(".file-name").textContent = file.name;
-    item.querySelector("[data-action='process']").addEventListener("click", async () => {
-      setStatus(`正在为 ${file.name} 创建占位处理结果...`);
+    item.querySelector("[data-action='transcribe']").addEventListener("click", async () => {
+      setStatus(`正在转写 ${file.name}...`);
       try {
-        await requestJson(`/api/process/${encodeURIComponent(file.meeting_id)}`, { method: "POST" });
-        setStatus("占位处理结果已创建。");
+        await requestJson(`/api/transcribe/${encodeURIComponent(file.meeting_id)}`, { method: "POST" });
+        setStatus("转写稿已生成。");
         await loadFiles();
       } catch (error) {
         setStatus(error.message);

@@ -1,0 +1,18 @@
+{
+  "asr": {
+    "provider": "faster_whisper",
+    "model": "base",
+    "device": "auto",
+    "compute_type": "default",
+    "language": "zh",
+    "enable_diarization": false
+  },
+  "llm": {
+    "provider": "openai_compatible",
+    "base_url": "http://127.0.0.1:11434/v1",
+    "api_key": "local",
+    "model": "qwen2.5:7b",
+    "temperature": 0.2,
+    "max_tokens": 4096
+  }
+}
