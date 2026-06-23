@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>会议助手</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="kicker">本地会议处理</p>
+          <h1>会议助手</h1>
+        </div>
+        <button id="refreshButton" class="icon-button" type="button" title="刷新文件列表">↻</button>
+      </header>
+
+      <section class="upload-panel" aria-labelledby="uploadTitle">
+        <div>
+          <h2 id="uploadTitle">音频上传</h2>
+          <p>支持 m4a、mp3、wav、flac。文件保存在本机 data/audio，不会进入 Git。</p>
+        </div>
+        <form id="uploadForm" class="upload-form">
+          <input id="audioInput" type="file" accept=".m4a,.mp3,.wav,.flac,audio/*" />
+          <button type="submit">上传音频</button>
+        </form>
+        <p id="uploadStatus" class="status-line" role="status"></p>
+      </section>
+
+      <section class="workspace" aria-label="会议文件">
+        <div class="file-column">
+          <div class="section-heading">
+            <h2>原始音频</h2>
+            <span id="audioCount">0</span>
+          </div>
+          <div id="audioList" class="file-list"></div>
+        </div>
+
+        <div class="file-column">
+          <div class="section-heading">
+            <h2>转写与规整稿</h2>
+            <span id="transcriptCount">0</span>
+          </div>
+          <div id="transcriptList" class="file-list"></div>
+        </div>
+
+        <div class="file-column">
+          <div class="section-heading">
+            <h2>内容提要</h2>
+            <span id="summaryCount">0</span>
+          </div>
+          <div id="summaryList" class="file-list"></div>
+        </div>
+      </section>
+
+      <section class="preview" aria-labelledby="previewTitle">
+        <div class="section-heading">
+          <h2 id="previewTitle">预览</h2>
+          <span id="previewMeta">未选择文件</span>
+        </div>
+        <pre id="previewContent">选择转写稿或内容提要后在这里查看。</pre>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -12,3 +12,8 @@ data/**
 *.bak
 *.swp
 *.DS_Store
+
+# Python local runtime artifacts.
+__pycache__/
+*.py[cod]
+.venv/
