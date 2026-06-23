@@ -8,6 +8,9 @@
   --accent: #1b6f5a;
   --accent-dark: #0f4d40;
   --warn: #8a4a13;
+  --danger: #a23434;
+  --done: #256f45;
+  --soft: #edf3ef;
 }
 
 * {
@@ -132,14 +135,15 @@ h2 {
   color: var(--warn);
 }
 
-.workspace {
+.workbench {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
   gap: 14px;
   margin-top: 16px;
 }
 
-.file-column {
+.queue-panel,
+.progress-panel {
   min-height: 320px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -170,6 +174,18 @@ h2 {
   border-radius: 8px;
   padding: 12px;
   background: #fbfcfb;
+  cursor: default;
+}
+
+.file-item.is-running,
+.file-item.is-queued {
+  border-color: var(--accent);
+  background: var(--soft);
+}
+
+.file-item.is-failed {
+  border-color: #e0b3ad;
+  background: #fff7f5;
 }
 
 .file-name {
@@ -183,11 +199,27 @@ h2 {
   font-size: 13px;
 }
 
+.file-state {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #edf0ed;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .file-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
+}
+
+.file-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .file-actions button.secondary {
@@ -207,6 +239,102 @@ h2 {
   padding: 16px;
 }
 
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.text-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 7px 10px;
+}
+
+.progress-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 16px;
+}
+
+.progress-card.is-running,
+.progress-card.is-queued {
+  border-color: var(--accent);
+}
+
+.progress-card.is-succeeded {
+  border-color: #9bc7ac;
+}
+
+.progress-card.is-failed {
+  border-color: #dfaaa3;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.status-row strong {
+  font-size: 18px;
+}
+
+.status-row span {
+  color: var(--muted);
+}
+
+.progress-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6ebe7;
+}
+
+.progress-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 180ms ease;
+}
+
+.progress-card.is-failed .progress-fill {
+  background: var(--danger);
+}
+
+.progress-card.is-succeeded .progress-fill {
+  background: var(--done);
+}
+
+#jobMessage {
+  min-height: 24px;
+  margin: 12px 0 14px;
+  color: var(--muted);
+}
+
+.steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.steps li {
+  color: var(--muted);
+}
+
+.steps li.is-done {
+  color: var(--done);
+  font-weight: 700;
+}
+
 pre {
   min-height: 180px;
   max-height: 420px;
@@ -222,7 +350,7 @@ pre {
 
 @media (max-width: 900px) {
   .upload-panel,
-  .workspace {
+  .workbench {
     grid-template-columns: 1fr;
   }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import re
+import threading
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +21,9 @@ SUMMARIES_DIR = DATA_DIR / "summaries"
 WEB_DIR = PROJECT_ROOT / "web"
 
 ALLOWED_AUDIO_EXTENSIONS = {".m4a", ".mp3", ".wav", ".flac"}
+
+JOBS_LOCK = threading.Lock()
+JOBS: dict[str, dict[str, object]] = {}
 
 
 def ensure_directories() -> None:
@@ -74,6 +78,91 @@ def list_files(directory: Path, suffixes: set[str] | None = None) -> list[dict[s
             }
         )
     return items
+
+
+def transcript_exists(meeting_id: str) -> bool:
+    return (TRANSCRIPTS_DIR / f"{meeting_id}.md").is_file()
+
+
+def summary_exists(meeting_id: str) -> bool:
+    return (SUMMARIES_DIR / f"{meeting_id}.md").is_file()
+
+
+def get_job(meeting_id: str) -> dict[str, object] | None:
+    with JOBS_LOCK:
+        job = JOBS.get(meeting_id)
+        return dict(job) if job else None
+
+
+def set_job(meeting_id: str, **updates: object) -> dict[str, object]:
+    with JOBS_LOCK:
+        job = JOBS.setdefault(
+            meeting_id,
+            {
+                "meeting_id": meeting_id,
+                "state": "idle",
+                "step": "等待",
+                "progress": 0,
+                "message": "",
+                "started_at": None,
+                "finished_at": None,
+            },
+        )
+        job.update(updates)
+        return dict(job)
+
+
+def list_jobs() -> list[dict[str, object]]:
+    with JOBS_LOCK:
+        return [dict(job) for job in JOBS.values()]
+
+
+def transcribe_in_background(meeting_id: str, audio: Path) -> None:
+    set_job(
+        meeting_id,
+        state="running",
+        step="语音识别中",
+        progress=35,
+        message="正在调用本地 ASR 模型识别音频。长音频在 CPU 上可能需要较久。",
+    )
+    try:
+        result = get_asr_client().transcribe(audio)
+        set_job(
+            meeting_id,
+            step="写入转写稿",
+            progress=85,
+            message=f"识别完成，正在保存 {len(result.segments)} 个片段。",
+        )
+        transcript = TRANSCRIPTS_DIR / f"{meeting_id}.md"
+        transcript.write_text(format_transcript(audio.name, result), encoding="utf-8")
+        set_job(
+            meeting_id,
+            state="succeeded",
+            step="完成",
+            progress=100,
+            message=f"转写稿已生成：{transcript.name}",
+            transcript=transcript.name,
+            segments=len(result.segments),
+            finished_at=int(time.time()),
+        )
+    except ASRError as exc:
+        set_job(
+            meeting_id,
+            state="failed",
+            step="失败",
+            progress=100,
+            message=str(exc),
+            finished_at=int(time.time()),
+        )
+    except Exception as exc:  # Keep background failures visible to the UI.
+        set_job(
+            meeting_id,
+            state="failed",
+            step="失败",
+            progress=100,
+            message=f"Unexpected transcription failure: {exc}",
+            finished_at=int(time.time()),
+        )
 
 
 def read_markdown(directory: Path, meeting_id: str) -> str | None:
@@ -148,8 +237,29 @@ class MeetingAssistantHandler(BaseHTTPRequestHandler):
                     "audio": list_files(AUDIO_DIR, ALLOWED_AUDIO_EXTENSIONS),
                     "transcripts": list_files(TRANSCRIPTS_DIR, {".md"}),
                     "summaries": list_files(SUMMARIES_DIR, {".md"}),
+                    "jobs": list_jobs(),
                 }
             )
+            return
+        if parsed.path.startswith("/api/jobs/"):
+            meeting_id = unquote(parsed.path.removeprefix("/api/jobs/"))
+            job = get_job(meeting_id)
+            if job is None:
+                self.send_json(
+                    {
+                        "meeting_id": meeting_id,
+                        "state": "succeeded" if transcript_exists(meeting_id) else "idle",
+                        "step": "已有转写稿" if transcript_exists(meeting_id) else "等待",
+                        "progress": 100 if transcript_exists(meeting_id) else 0,
+                        "message": "转写稿已存在。" if transcript_exists(meeting_id) else "尚未开始转写。",
+                        "transcript_exists": transcript_exists(meeting_id),
+                        "summary_exists": summary_exists(meeting_id),
+                    }
+                )
+                return
+            job["transcript_exists"] = transcript_exists(meeting_id)
+            job["summary_exists"] = summary_exists(meeting_id)
+            self.send_json(job)
             return
         if parsed.path.startswith("/api/transcripts/"):
             meeting_id = unquote(parsed.path.removeprefix("/api/transcripts/"))
@@ -225,15 +335,25 @@ class MeetingAssistantHandler(BaseHTTPRequestHandler):
         if audio is None:
             self.send_error_json(HTTPStatus.NOT_FOUND, "Audio file not found.")
             return
-        try:
-            result = get_asr_client().transcribe(audio)
-        except ASRError as exc:
-            self.send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, str(exc))
+        current = get_job(meeting_id)
+        if current and current.get("state") == "running":
+            self.send_json(current, HTTPStatus.ACCEPTED)
             return
 
-        transcript = TRANSCRIPTS_DIR / f"{meeting_id}.md"
-        transcript.write_text(format_transcript(audio.name, result), encoding="utf-8")
-        self.send_json({"meeting_id": meeting_id, "transcript": transcript.name, "segments": len(result.segments)})
+        job = set_job(
+            meeting_id,
+            state="queued",
+            step="排队",
+            progress=5,
+            message="转写任务已创建。",
+            started_at=int(time.time()),
+            finished_at=None,
+            transcript=None,
+            segments=None,
+        )
+        thread = threading.Thread(target=transcribe_in_background, args=(meeting_id, audio), daemon=True)
+        thread.start()
+        self.send_json(job, HTTPStatus.ACCEPTED)
 
     def handle_placeholder_process(self, meeting_id: str) -> None:
         audio = self.find_audio(meeting_id)

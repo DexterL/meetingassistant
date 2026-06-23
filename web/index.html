@@ -28,36 +28,47 @@
         <p id="uploadStatus" class="status-line" role="status"></p>
       </section>
 
-      <section class="workspace" aria-label="会议文件">
-        <div class="file-column">
+      <section class="workbench" aria-label="音频转换工作台">
+        <div class="queue-panel">
           <div class="section-heading">
-            <h2>原始音频</h2>
+            <h2>音频队列</h2>
             <span id="audioCount">0</span>
           </div>
           <div id="audioList" class="file-list"></div>
         </div>
 
-        <div class="file-column">
+        <div class="progress-panel">
           <div class="section-heading">
-            <h2>转写与规整稿</h2>
-            <span id="transcriptCount">0</span>
+            <h2>转换进展</h2>
+            <span id="activeMeeting">未选择音频</span>
           </div>
-          <div id="transcriptList" class="file-list"></div>
-        </div>
-
-        <div class="file-column">
-          <div class="section-heading">
-            <h2>内容提要</h2>
-            <span id="summaryCount">0</span>
+          <div id="progressCard" class="progress-card is-idle">
+            <div class="status-row">
+              <strong id="jobState">等待开始</strong>
+              <span id="jobStep">请选择一个音频文件</span>
+            </div>
+            <div class="progress-track" aria-label="转换进度">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <p id="jobMessage">上传或选择音频后，点击“开始转写”。</p>
+            <ol class="steps">
+              <li id="stepQueued">创建任务</li>
+              <li id="stepModel">加载模型</li>
+              <li id="stepTranscribe">语音识别</li>
+              <li id="stepWrite">写入转写稿</li>
+              <li id="stepDone">完成</li>
+            </ol>
           </div>
-          <div id="summaryList" class="file-list"></div>
         </div>
       </section>
 
       <section class="preview" aria-labelledby="previewTitle">
         <div class="section-heading">
-          <h2 id="previewTitle">预览</h2>
-          <span id="previewMeta">未选择文件</span>
+          <h2 id="previewTitle">转换结果</h2>
+          <div class="result-actions">
+            <span id="previewMeta">未选择文件</span>
+            <button id="reloadResultButton" class="text-button" type="button">刷新结果</button>
+          </div>
         </div>
         <pre id="previewContent">选择转写稿或内容提要后在这里查看。</pre>
       </section>
