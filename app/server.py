@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from app.asr import ASRError, format_transcript, get_asr_client
+from app.llm import LLMError, clean_transcript_file
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -180,7 +181,7 @@ def write_placeholder_transcript(meeting_id: str, audio_name: str) -> Path:
     target.write_text(
         "\n".join(
             [
-                "# 会议转写与规整稿",
+                "# 会议原始转写稿",
                 "",
                 f"音频文件：{audio_name}",
                 "识别模型：待接入",
@@ -188,10 +189,6 @@ def write_placeholder_transcript(meeting_id: str, audio_name: str) -> Path:
                 "## 原始转写",
                 "",
                 "[待接入 ASR] 当前阶段已完成音频文件接收和本地文件流转，下一阶段接入语音识别后写入真实转写内容。",
-                "",
-                "## 规整记录",
-                "",
-                "[待接入 LLM] 当前阶段暂不生成规整内容。",
                 "",
             ]
         ),
@@ -208,13 +205,13 @@ def write_placeholder_summary(meeting_id: str) -> Path:
     target.write_text(
         "\n".join(
             [
-                "# 会议内容提要",
+                "# 会议记录",
                 "",
                 "## 当前状态",
                 "",
                 "- 音频文件已进入本地处理目录。",
-                "- ASR、文本规整和内容提要模型尚未接入。",
-                "- 后续接入模型后，此文件将写入真实会议内容提要。",
+                "- ASR、文本规整模型尚未接入完整流程。",
+                "- 后续接入模型后，此文件将写入真实会议记录和总结。",
                 "",
             ]
         ),
@@ -283,6 +280,10 @@ class MeetingAssistantHandler(BaseHTTPRequestHandler):
         if parsed.path.startswith("/api/process/"):
             meeting_id = unquote(parsed.path.removeprefix("/api/process/"))
             self.handle_placeholder_process(meeting_id)
+            return
+        if parsed.path.startswith("/api/clean/"):
+            meeting_id = unquote(parsed.path.removeprefix("/api/clean/"))
+            self.handle_clean_transcript(meeting_id)
             return
         self.send_error_json(HTTPStatus.NOT_FOUND, "Endpoint not found.")
 
@@ -368,6 +369,28 @@ class MeetingAssistantHandler(BaseHTTPRequestHandler):
                 "transcript": transcript.name,
                 "summary": summary.name,
                 "status": "placeholder_created",
+            }
+        )
+
+    def handle_clean_transcript(self, meeting_id: str) -> None:
+        transcript = TRANSCRIPTS_DIR / f"{meeting_id}.md"
+        if not transcript.exists():
+            self.send_error_json(HTTPStatus.NOT_FOUND, "Transcript file not found.")
+            return
+        summary = SUMMARIES_DIR / f"{meeting_id}.md"
+        try:
+            _, result = clean_transcript_file(transcript, summary)
+        except LLMError as exc:
+            self.send_error_json(HTTPStatus.SERVICE_UNAVAILABLE, str(exc))
+            return
+
+        self.send_json(
+            {
+                "meeting_id": meeting_id,
+                "transcript": transcript.name,
+                "summary": summary.name,
+                "model": result.model,
+                "status": "cleaned",
             }
         )
 

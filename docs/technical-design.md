@@ -35,8 +35,8 @@ data/
 目录说明：
 
 - `data/audio/`：原始会议音频。
-- `data/transcripts/`：ASR 转写稿和规整后的会议记录。
-- `data/summaries/`：会议内容提要。
+- `data/transcripts/`：ASR 原始转写稿。
+- `data/summaries/`：整理后的会议记录与总结。
 
 当前 `.gitignore` 会忽略 `data/` 下所有真实数据，只保留 `.gitkeep`。
 
@@ -66,7 +66,7 @@ Web 前端
   +--> LLM 服务
 ```
 
-MVP 采用单机同步处理：上传音频后，按顺序执行 ASR、可选说话人分离、文本规整、内容提要生成。
+MVP 采用单机处理：上传音频后，按顺序执行 ASR、文本规整、内容提要生成。说话人分离保留为可选能力，不作为当前推进阻塞项。存储上只保留 `audio`、`transcripts`、`summaries` 三个独立目录。
 
 ## 5. 处理流程
 
@@ -105,9 +105,9 @@ MVP 采用单机同步处理：上传音频后，按顺序执行 ASR、可选说
 [00:00:09 - 00:00:16] 这里是下一段文本。
 ```
 
-### 5.3 可选说话人分离
+### 5.3 可选说话人分离（当前暂缓）
 
-说话人分离作为可选能力，不阻塞主流程。
+说话人分离作为可选能力，不阻塞主流程。当前阶段允许跳过 F4，直接进入 F5 文本规整。
 
 若模型支持说话人分离，转写稿格式为：
 
@@ -132,29 +132,28 @@ MVP 采用单机同步处理：上传音频后，按顺序执行 ASR、可选说
 - 保留关键数字、名称、日期、术语。
 - 尽量保持会议讨论顺序。
 
-规整后的内容仍写入 `data/transcripts/<meeting_id>.md`，建议在同一文件中保留两个章节：
+规整后的内容写入 `data/summaries/<meeting_id>.md`，不回写 `data/transcripts/`。
 
 ```markdown
-# 会议转写与规整稿
+# 会议记录
 
-## 原始转写
+来源转写稿：<meeting_id>.md
+整理模型：<llm_model>
 
-...
-
-## 规整记录
+## 整理内容
 
 ...
 ```
 
 ### 5.5 会议内容提要
 
-提要输入来自规整记录。提要目标：
+提要输入来自整理后的会议记录。提要目标：
 
 - 按议题归纳主要讨论内容。
 - 保持中立客观。
 - 不补充原文不存在的信息。
 
-输出保存到 `data/summaries/<meeting_id>.md`。
+输出仍保存到 `data/summaries/<meeting_id>.md`。第三类目录只保存最终文字成果，不再拆出额外目录。
 
 建议格式：
 
@@ -174,7 +173,7 @@ MVP 采用单机同步处理：上传音频后，按顺序执行 ASR、可选说
 
 ## 6. 模型配置设计
 
-模型选择必须可配置。开发阶段可用小模型，实际部署阶段可切换到大模型。
+模型选择必须可配置。开发阶段可用小模型，实际部署阶段可切换到更大模型或中文专项模型。
 
 示例配置：
 
@@ -189,13 +188,35 @@ llm:
 
 asr:
   provider: "faster_whisper"
-  model: "large-v3"
-  device: "cuda"
+  model: "small"
+  device: "auto"
+  compute_type: "default"
   language: "zh"
+  beam_size: 5
+  best_of: 5
+  temperature: 0
+  vad_filter: true
+  vad_parameters:
+    min_silence_duration_ms: 500
+  condition_on_previous_text: true
+  initial_prompt: "以下是普通话会议录音，请使用简体中文输出，保留专有名词、人名、项目名和数字。"
   enable_diarization: false
 ```
 
-实际内网大模型环境只改配置：
+实际内网环境只改配置即可切换模型档位：
+
+```yaml
+asr:
+  provider: "faster_whisper"
+  model: "large-v3"
+  device: "cuda"
+  compute_type: "float16"
+  language: "zh"
+  beam_size: 5
+  vad_filter: true
+```
+
+LLM 同样通过配置切换：
 
 ```yaml
 llm:
@@ -213,6 +234,10 @@ llm:
 - `LLMClient.clean_transcript(transcript, options)`
 - `LLMClient.generate_topic_summary(cleaned_transcript, options)`
 
+ASR 选型和参数逻辑详见 [ASR 模型选型与参数配置说明](asr-tuning-plan.md)。
+
+说话人分离的需求判断详见 [说话人分离需求分析与当前决策](diarization-decision.md)。
+
 ## 7. API 草案
 
 | 方法 | 路径 | 说明 |
@@ -220,11 +245,11 @@ llm:
 | POST | `/api/audio` | 上传音频，保存到 `data/audio/` |
 | GET | `/api/files` | 获取本地音频、转写稿、提要文件列表 |
 | POST | `/api/transcribe/{meeting_id}` | 对音频执行语音识别 |
-| POST | `/api/clean/{meeting_id}` | 对转写稿执行文本规整 |
-| POST | `/api/summarize/{meeting_id}` | 对规整稿生成会议内容提要 |
+| POST | `/api/clean/{meeting_id}` | 对转写稿执行文本规整，结果写入 `data/summaries/` |
+| POST | `/api/summarize/{meeting_id}` | 对整理后的会议记录生成会议内容提要 |
 | POST | `/api/process/{meeting_id}` | 顺序执行转写、规整、提要 |
-| GET | `/api/transcripts/{meeting_id}` | 读取转写/规整稿 |
-| GET | `/api/summaries/{meeting_id}` | 读取会议内容提要 |
+| GET | `/api/transcripts/{meeting_id}` | 读取 ASR 原始转写稿 |
+| GET | `/api/summaries/{meeting_id}` | 读取整理后的会议记录与总结 |
 
 ## 8. 分阶段实现计划
 
@@ -244,29 +269,38 @@ llm:
 
 - 接入本地 ASR。
 - 对样例音频生成 `data/transcripts/<meeting_id>.md`。
-- 暂不强制说话人分离。
 
 验收标准：
 
 - 样例音频可以生成可读转写稿。
 - 转写稿被 Git 忽略。
 
-### 阶段三：可选说话人分离
+### 阶段三：说话人分离决策
 
-- 评估 ASR 模型是否直接支持说话人标注。
-- 若支持，在转写稿中增加 `Speaker N`。
-- 若效果不稳定，保留时间戳，不阻塞后续规整和提要。
+当前决策：暂缓 F4，不作为下一阶段开发任务。
+
+原因：
+
+- 当前 ASR 转写效果已经满足进入文本规整的前置条件。
+- 说话人分离需要额外模型或 provider，会引入新的依赖和离线部署问题。
+- 当前目标更关注会议记录规整和内容提要，先推进 F5/F6 更快产生业务价值。
+
+保留策略：
+
+- 配置中继续保留 `enable_diarization`。
+- 转写稿格式继续兼容 `Speaker N`。
+- 后续如果明确需要“谁说了什么”，再单独评估 pyannote、FunASR 或其他方案。
 
 验收标准：
 
-- 开关 `enable_diarization` 可控制是否启用说话人分离。
-- 不启用时主流程仍可正常完成。
+- 关闭或不实现说话人分离时，ASR、文本规整、会议提要流程不受影响。
 
-### 阶段四：文本规整
+### 阶段四：文本规整（进行中）
 
 - 接入本地小参数 LLM。
 - 实现 `LLMClient.clean_transcript`。
-- 将原始转写和规整记录写入 `data/transcripts/<meeting_id>.md`。
+- 将整理后的会议记录写入 `data/summaries/<meeting_id>.md`。
+- 先使用 OpenAI-compatible 本地 LLM 服务，保持后续模型可配置切换。
 
 验收标准：
 
@@ -277,14 +311,14 @@ llm:
 ### 阶段五：会议内容提要
 
 - 实现 `LLMClient.generate_topic_summary`。
-- 基于规整记录生成 `data/summaries/<meeting_id>.md`。
+- 基于 `data/summaries/<meeting_id>.md` 中的整理内容补充会议提要。
 - 只生成内容提要。
 
 验收标准：
 
 - 提要按议题组织。
 - 提要不包含原文没有的信息。
-- 同一份规整稿可以通过配置切换小模型/大模型重复生成提要。
+- 同一份转写稿可以通过配置切换小模型/大模型重复生成最终文字成果。
 
 ## 9. 质量评估
 
@@ -296,6 +330,7 @@ llm:
 
 ### 说话人分离
 
+- 当前暂缓，不作为进入 F5 的前置条件。
 - 是否能区分主要发言人。
 - 说话人标签错误是否影响阅读。
 - 效果不佳时是否可以关闭。
@@ -316,9 +351,8 @@ llm:
 
 1. 当前样例音频主要是普通话，还是存在中英混合？
 2. 单个音频典型时长和最长时长是多少？
-3. F4 说话人分离在当前阶段是必须验证，还是可以作为可选开关？
-4. `data/transcripts/<meeting_id>.md` 是否接受同时包含“原始转写”和“规整记录”两个章节？
-5. 会议内容提要是否按“议题”组织即可，是否需要固定模板？
+3. F4 暂缓后，是否接受转写稿仅保留时间戳、不标注发言人？
+4. 会议内容提要是否按“议题”组织即可，是否需要固定模板？
 
 ## 11. 参考资料
 

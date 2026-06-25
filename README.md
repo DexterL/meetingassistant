@@ -26,21 +26,28 @@ http://127.0.0.1:8765
 
 ```text
 data/audio/        原始会议音频
-data/transcripts/  ASR 转写稿和规整后的会议记录
-data/summaries/    会议内容提要
+data/transcripts/  ASR 原始转写稿
+data/summaries/    整理后的会议记录与总结
 ```
 
 `data/` 下真实数据会被 `.gitignore` 忽略，只提交 `.gitkeep` 保留目录。
 
 ## 当前状态
 
-已实现阶段一：
+已实现：
 
 - 本地 Web 页面
 - 音频上传
 - 本地文件列表
-- 转写稿和内容提要预览
-- 占位处理接口，为后续 ASR/LLM 接入保留流程
+- 本地 ASR 转写
+- 转写进展查看
+- 转写稿预览
+- 基于本地 OpenAI-compatible LLM 的文本规整入口
+
+下一步聚焦 F5/F6：
+
+- 优化文本规整提示词和配置。
+- 基于 ASR 转写稿生成整理后的会议记录与总结。
 
 ## ASR 配置
 
@@ -65,3 +72,26 @@ cp config/app.example.json config/app.json
 ```bash
 .venv/bin/python scripts/transcribe_audio.py 讨论音频样例
 ```
+
+## 文本规整
+
+文本规整通过 OpenAI-compatible 本地 LLM 服务完成。默认配置位于 `config/app.example.json`：
+
+```json
+{
+  "llm": {
+    "provider": "openai_compatible",
+    "base_url": "http://127.0.0.1:11434/v1",
+    "api_key": "local",
+    "model": "qwen2.5:7b"
+  }
+}
+```
+
+服务可用后，页面点击“整理记录”，或调用：
+
+```bash
+curl -X POST http://127.0.0.1:8765/api/clean/<meeting_id>
+```
+
+整理结果会写入 `data/summaries/<meeting_id>.md`。如果本地 LLM 服务未启动，接口会返回明确错误，不会改写转写稿。

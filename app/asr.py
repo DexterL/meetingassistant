@@ -45,7 +45,7 @@ def format_timestamp(seconds: float) -> str:
 
 def format_transcript(audio_name: str, result: ASRResult) -> str:
     lines = [
-        "# 会议转写与规整稿",
+        "# 会议原始转写稿",
         "",
         f"音频文件：{audio_name}",
         f"识别模型：{result.model}",
@@ -60,7 +60,7 @@ def format_transcript(audio_name: str, result: ASRResult) -> str:
         speaker = f"{segment.speaker}：" if segment.speaker else ""
         lines.append(f"[{start} - {end}] {speaker}{segment.text.strip()}")
 
-    lines.extend(["", "## 规整记录", "", "[待接入 LLM] 当前阶段尚未生成规整内容。", ""])
+    lines.append("")
     return "\n".join(lines)
 
 

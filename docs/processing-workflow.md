@@ -5,8 +5,8 @@
 现阶段只围绕以下文件流转：
 
 - 原始音频。
-- ASR 转写稿和规整后的会议记录。
-- 会议内容提要。
+- ASR 原始转写稿。
+- 整理后的会议记录与总结。
 
 ## 2. 目录结构
 
@@ -23,16 +23,15 @@ data/
 目录说明：
 
 - `data/audio/`：原始会议音频。
-- `data/transcripts/`：转写稿和规整记录。
-- `data/summaries/`：会议内容提要。
+- `data/transcripts/`：ASR 原始转写稿。
+- `data/summaries/`：整理后的会议记录与总结。
 
 ## 3. 处理过程
 
 1. 音频进入 `data/audio/`。
 2. ASR 生成转写稿，写入 `data/transcripts/`。
-3. 可选执行说话人分离，在转写稿中增加 `Speaker N`。
-4. LLM 对转写稿进行规整，仍写入 `data/transcripts/`。
-5. LLM 基于规整记录生成会议内容提要，写入 `data/summaries/`。
+3. 当前跳过说话人分离，保留时间戳即可；判断依据见 `docs/diarization-decision.md`。
+4. LLM 基于转写稿生成整理后的会议记录与总结，写入 `data/summaries/`。
 
 ## 4. 命名建议
 

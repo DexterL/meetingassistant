@@ -12,6 +12,7 @@ const jobStep = document.querySelector("#jobStep");
 const jobMessage = document.querySelector("#jobMessage");
 const previewContent = document.querySelector("#previewContent");
 const previewMeta = document.querySelector("#previewMeta");
+const cleanTranscriptButton = document.querySelector("#cleanTranscriptButton");
 const reloadResultButton = document.querySelector("#reloadResultButton");
 
 const stepNodes = {
@@ -152,6 +153,18 @@ async function loadTranscript(meetingId = selectedMeetingId) {
   }
 }
 
+async function loadSummary(meetingId = selectedMeetingId) {
+  if (!meetingId) return;
+  try {
+    const data = await requestJson(`/api/summaries/${encodeURIComponent(meetingId)}`);
+    previewMeta.textContent = `${meetingId}.md`;
+    previewContent.textContent = data.content;
+  } catch (error) {
+    previewMeta.textContent = "暂无会议记录";
+    previewContent.textContent = error.message;
+  }
+}
+
 function renderAudioFiles(files, jobs = []) {
   const jobsByMeeting = new Map(jobs.map((job) => [job.meeting_id, job]));
   audioCount.textContent = String(files.length);
@@ -228,6 +241,24 @@ refreshButton.addEventListener("click", () => {
 
 reloadResultButton.addEventListener("click", () => {
   loadTranscript().catch((error) => setStatus(error.message));
+});
+
+cleanTranscriptButton.addEventListener("click", async () => {
+  if (!selectedMeetingId) {
+    setStatus("请选择一个已有转写稿的音频。");
+    return;
+  }
+  setStatus("正在整理会议记录...");
+  cleanTranscriptButton.disabled = true;
+  try {
+    await requestJson(`/api/clean/${encodeURIComponent(selectedMeetingId)}`, { method: "POST" });
+    setStatus("会议记录已整理。");
+    await loadSummary(selectedMeetingId);
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    cleanTranscriptButton.disabled = false;
+  }
 });
 
 loadFiles().catch((error) => setStatus(error.message));
